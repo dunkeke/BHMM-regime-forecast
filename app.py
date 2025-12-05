@@ -178,7 +178,8 @@ def train_bayesian_hmm(df, n_comps, n_iter):
     X = df[['Log_Ret', 'Volatility']].values * scale
     
     try:
-        model = GaussianHMM(n_components=n_comps, covariance_type="full", n_iter=1000, 
+        # Fixed: Use n_iter parameter instead of hardcoded 1000
+        model = GaussianHMM(n_components=n_comps, covariance_type="full", n_iter=n_iter, 
                            random_state=42, tol=0.01, min_covar=0.001)
         model.fit(X)
     except: return None, None
@@ -269,7 +270,8 @@ if st.session_state.scanned:
             df = get_data(ticker, start_date, end_date, window_size)
             if df is None: continue
             
-            df, probs = train_bayesian_hmm(df.copy(), n_components, iter_num=1000)
+            # Fixed: Use correct keyword argument n_iter and pass the sidebar variable iter_num
+            df, probs = train_bayesian_hmm(df.copy(), n_components, n_iter=iter_num)
             if df is None: continue
                 
             df, metrics = run_backtest_logic(df, transaction_cost)
