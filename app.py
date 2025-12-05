@@ -161,10 +161,7 @@ def get_data(ticker, start, end, window):
             try: df.columns = df.columns.get_level_values(0)
             except: pass 
         if len(df) < 252: return None
-        
-        # Ensure Close column exists
-        if 'Close' not in df.columns:
-            return None
+        if 'Close' not in df.columns: pass 
 
         data = df[['Close']].copy()
         data['Log_Ret'] = np.log(data['Close'] / data['Close'].shift(1))
@@ -178,8 +175,7 @@ def train_bayesian_hmm(df, n_comps, n_iter):
     X = df[['Log_Ret', 'Volatility']].values * scale
     
     try:
-        # Fixed: Use n_iter parameter instead of hardcoded 1000
-        model = GaussianHMM(n_components=n_comps, covariance_type="full", n_iter=n_iter, 
+        model = GaussianHMM(n_components=n_comps, covariance_type="full", n_iter=1000, 
                            random_state=42, tol=0.01, min_covar=0.001)
         model.fit(X)
     except: return None, None
@@ -227,17 +223,8 @@ def run_backtest_logic(df, cost):
     
     total_ret = df['Cum_Strat'].iloc[-1] - 1
     annual_ret = (1 + total_ret) ** (252 / len(df)) - 1
-    
-    std_dev = df['Strategy_Ret'].std()
-    if std_dev != 0:
-        sharpe = (df['Strategy_Ret'].mean() * 252) / (std_dev * np.sqrt(252))
-    else:
-        sharpe = 0
-        
-    # Calculate Drawdown
-    cum_max = df['Cum_Strat'].cummax()
-    drawdown = (df['Cum_Strat'] - cum_max) / cum_max
-    max_dd = drawdown.min()
+    sharpe = (df['Strategy_Ret'].mean() * 252) / (df['Strategy_Ret'].std() * np.sqrt(252)) if df['Strategy_Ret'].std() != 0 else 0
+    max_dd = ((df['Cum_Strat'] - df['Cum_Strat'].cummax()) / df['Cum_Strat'].cummax()).min()
     
     return df, {"Total Return": total_ret, "CAGR": annual_ret, "Sharpe": sharpe, "Max Drawdown": max_dd}
 
@@ -248,14 +235,7 @@ def run_backtest_logic(df, cost):
 st.title("💠 BHMM QUANT TERMINAL")
 st.markdown(f"<div style='color: #8b9bb4; margin-bottom: 20px;'>Bayesian Regime Switching Model | <span style='color: #2962FF;'>{start_date}</span> to <span style='color: #2962FF;'>{end_date}</span></div>", unsafe_allow_html=True)
 
-# Use session state to persist scan results across interactions
-if "scanned" not in st.session_state:
-    st.session_state.scanned = False
-
 if st.button("INITIATE MARKET SCAN", use_container_width=True, type="primary"):
-    st.session_state.scanned = True
-
-if st.session_state.scanned:
     
     results_summary = {}
     regime_data = {}
@@ -270,8 +250,7 @@ if st.session_state.scanned:
             df = get_data(ticker, start_date, end_date, window_size)
             if df is None: continue
             
-            # Fixed: Use correct keyword argument n_iter and pass the sidebar variable iter_num
-            df, probs = train_bayesian_hmm(df.copy(), n_components, n_iter=iter_num)
+            df, probs = train_bayesian_hmm(df.copy(), n_components, 1000)
             if df is None: continue
                 
             df, metrics = run_backtest_logic(df, transaction_cost)
@@ -440,11 +419,15 @@ if st.session_state.scanned:
                 font=dict(family="Roboto Mono", size=10)
             )
             st.plotly_chart(fig_c, use_container_width=True)
-        else:
-            st.warning("Need >1 Assets")
+        else: st.warning("Need >1 Assets")
 
     st.markdown("---")
     st.markdown("<div style='text-align:center; color: #555; font-size: 0.8rem;'>QUANTITATIVE RESEARCH ONLY | NOT FINANCIAL ADVICE</div>", unsafe_allow_html=True)
 
 else:
     st.info("System Ready. Initialize Scan from Sidebar.")
+    st.caption("⚠️ **Disclaimer:** This tool is for quantitative research purposes only. Past performance is not indicative of future results. Not financial advice.")
+
+else:
+    # Empty State
+    st.info("👈 Please configure parameters in the sidebar and click **'🚀 SCAN MARKETS'** to begin.")
